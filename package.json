@@ -57,7 +57,7 @@
         "portable"
       ],
       "icon": "assets/icon.png",
-      "artifactName": "ARIA-Setup.${ext}"
+      "artifactName": "ARIA-Setup-${version}.${ext}"
     },
     "nsis": {
       "oneClick": false,
@@ -65,7 +65,7 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "ARIA AI Assistant",
-      "artifactName": "ARIA-Setup.exe"
+      "artifactName": "ARIA-Setup-${version}.exe"
     },
     "mac": {
       "target": [
@@ -74,7 +74,7 @@
       ],
       "icon": "assets/icon.png",
       "category": "public.app-category.productivity",
-      "artifactName": "ARIA.${ext}",
+      "artifactName": "ARIA-${version}.${ext}",
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
       "entitlements": "desktop/entitlements.mac.plist",
