@@ -2,7 +2,6 @@ import express from "express";
 import http from "node:http";
 import path from "node:path";
 import fs from "node:fs";
-import { createServer as createViteServer } from "vite";
 import { WebSocketServer } from "ws";
 import { GoogleGenAI, Modality, Type, LiveServerMessage } from "@google/genai";
 import dotenv from "dotenv";
@@ -17,6 +16,11 @@ const app = express();
 app.use(express.json());
 const PORT = 3000;
 const server = http.createServer(app);
+
+// Health check endpoint
+app.get("/api/health", (_req, res) => {
+  res.json({ status: "ok", app: "ARIA Desktop Assistant", version: "1.0.0" });
+});
 
 interface ConfirmationRequest {
   resolve: (confirmed: boolean) => void;
@@ -2733,33 +2737,64 @@ Please naturally follow this application/tab, understand the user's workflow, an
 });
 
 /**
- * Static file routing setup
+ * Static file routing and server bootstrap
  */
-async function startApp() {
+export async function startApp() {
   if (process.env.NODE_ENV !== "production") {
-    // Inject Vite middleware for development
-    const viteOnServer = await createViteServer({
-      server: { 
-        middlewareMode: true,
-        hmr: { server }
-      },
-      appType: "spa",
-    });
-    app.use(viteOnServer.middlewares);
+    // Dynamically inject Vite middleware for development
+    try {
+      const { createServer: createViteServer } = await import("vite");
+      const viteOnServer = await createViteServer({
+        server: { 
+          middlewareMode: true,
+          hmr: { server }
+        },
+        appType: "spa",
+      });
+      app.use(viteOnServer.middlewares);
+    } catch (e) {
+      console.warn("[Server] Vite middleware dynamic import warning:", e);
+    }
   } else {
-    // Serve static compiled output in production
-    const distPath = path.join(process.cwd(), "dist");
+    // Locate the compiled dist directory with fallback searches
+    const candidates = [
+      path.join(__dirname),
+      path.join(process.cwd(), "dist"),
+      path.join(__dirname, "..", "dist"),
+      path.join(__dirname, "dist"),
+      path.join(process.cwd())
+    ];
+
+    let distPath = candidates[0];
+    for (const candidate of candidates) {
+      if (fs.existsSync(path.join(candidate, "index.html"))) {
+        distPath = candidate;
+        break;
+      }
+    }
+
+    console.log(`[Server] Serving production frontend from: ${distPath}`);
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
+      const indexPath = path.join(distPath, "index.html");
+      if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+      } else {
+        res.status(200).send(`<!DOCTYPE html><html><head><title>ARIA Assistant</title></head><body style="background:#07080d;color:#fff;font-family:sans-serif;padding:40px;text-align:center;"><h2>ARIA AI Assistant</h2><p>Loading application resources...</p></body></html>`);
+      }
     });
   }
 
-  server.listen(PORT, "0.0.0.0", () => {
-    console.log(`[Server] Core node server running on http://0.0.0.0:${PORT}`);
-  });
+  // Prevent multiple listens if called more than once
+  if (!server.listening) {
+    server.listen(PORT, "0.0.0.0", () => {
+      console.log(`[Server] Core node server running on http://0.0.0.0:${PORT}`);
+    });
+  }
 }
 
+// Auto-boot if run as entry script
 startApp().catch((err) => {
   console.error("[Server] Start server failure:", err);
 });
+

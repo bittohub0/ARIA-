@@ -36,8 +36,9 @@ export class LiveSession {
     
     // Auto-detect endpoint protocol to support secure/unsecure connections adapting flawlessly
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const host = window.location.host || "localhost:3000";
     const wakeWord = useMiraStore.getState().wakeWord || localStorage.getItem("mira_user_wake_word") || "Hey ARIA";
-    const wsUrl = `${protocol}//${window.location.host}/ws?wakeWord=${encodeURIComponent(wakeWord)}`;
+    const wsUrl = `${protocol}//${host}/ws?wakeWord=${encodeURIComponent(wakeWord)}`;
     
     console.log(`[LiveSession] Connecting ws bridge: ${wsUrl} with wakeWord "${wakeWord}"`);
     

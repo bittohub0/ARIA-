@@ -85,35 +85,47 @@ function saveWindowState(win: BrowserWindow) {
  * Start Backend Server for full-stack API and WebSocket synchronization
  */
 function startBackendServer() {
-  console.log("[Electron] Starting ARIA backend server process...");
+  console.log("[Electron] Initializing ARIA backend server...");
   
   if (isDev) {
-    serverProcess = spawn("npx", ["tsx", "server.ts"], {
-      shell: true,
-      stdio: "inherit",
-      env: { ...process.env, NODE_ENV: "development" }
-    });
-  } else {
-    // Production bundle
-    const serverPath = path.join(__dirname, "..", "server.cjs");
-    const fallbackPath = path.join(__dirname, "server.cjs");
-    const activePath = fs.existsSync(serverPath) ? serverPath : fallbackPath;
-
-    if (fs.existsSync(activePath)) {
-      serverProcess = spawn("node", [activePath], {
+    try {
+      serverProcess = spawn("npx", ["tsx", "server.ts"], {
         shell: true,
         stdio: "inherit",
-        env: { ...process.env, NODE_ENV: "production" }
+        env: { ...process.env, NODE_ENV: "development" }
       });
-    } else {
-      console.warn("[Electron] Production server bundle not found at:", activePath);
+      serverProcess.on("error", (err) => {
+        console.error("[Electron] Dev backend server spawn error:", err);
+      });
+    } catch (e) {
+      console.warn("[Electron] Could not spawn dev server:", e);
     }
-  }
+  } else {
+    // In production, execute the server bundle directly using Electron's built-in Node runtime
+    const candidatePaths = [
+      path.join(__dirname, "..", "server.cjs"),
+      path.join(__dirname, "server.cjs"),
+      path.join(app.getAppPath(), "dist", "server.cjs"),
+      path.join(app.getAppPath(), "server.cjs")
+    ];
 
-  if (serverProcess) {
-    serverProcess.on("error", (err) => {
-      console.error("[Electron] Backend server process error:", err);
-    });
+    let started = false;
+    for (const serverPath of candidatePaths) {
+      if (fs.existsSync(serverPath)) {
+        try {
+          console.log(`[Electron] Booting native in-process server from: ${serverPath}`);
+          require(serverPath);
+          started = true;
+          break;
+        } catch (err) {
+          console.error(`[Electron] Error loading server from ${serverPath}:`, err);
+        }
+      }
+    }
+
+    if (!started) {
+      console.warn("[Electron] Warning: Could not locate compiled server.cjs in expected paths.");
+    }
   }
 }
 
@@ -219,22 +231,37 @@ function createMainWindow() {
     mainWindow.maximize();
   }
 
-  // Load URL with automatic retry
+  // Diagnostic logging for renderer debugging
+  mainWindow.webContents.on("did-fail-load", (_event, errorCode, errorDescription, validatedURL) => {
+    console.error(`[Electron] Renderer failed to load: ${errorDescription} (${errorCode}) at ${validatedURL}`);
+  });
+
+  mainWindow.webContents.on("console-message", (_event, level, message, line, sourceId) => {
+    console.log(`[Renderer Console (${level})]: ${message} (${sourceId}:${line})`);
+  });
+
+  // Load URL with rapid automatic retry and fallback
   const targetUrl = "http://localhost:3000";
-  const tryLoad = (attemptsLeft = 10) => {
-    if (!mainWindow) return;
+  const tryLoad = (attemptsLeft = 20) => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
     mainWindow.loadURL(targetUrl).catch((err) => {
       if (attemptsLeft > 0) {
-        console.log(`[Electron] Waiting for server at ${targetUrl}... (${attemptsLeft} retries left)`);
-        setTimeout(() => tryLoad(attemptsLeft - 1), 1000);
+        console.log(`[Electron] Connecting to ARIA core at ${targetUrl}... (${attemptsLeft} retries remaining)`);
+        setTimeout(() => tryLoad(attemptsLeft - 1), 400);
       } else {
-        console.error("[Electron] Failed to connect to server:", err);
+        console.error("[Electron] Failed to connect to server after all attempts. Falling back to local dist files:", err);
+        const fallbackDistIndex = path.join(app.getAppPath(), "dist", "index.html");
+        if (fs.existsSync(fallbackDistIndex)) {
+          mainWindow?.loadFile(fallbackDistIndex).catch(loadErr => {
+            console.error("[Electron] Fallback local file load also failed:", loadErr);
+          });
+        }
       }
     });
   };
 
-  // Give server 1.5s to start then connect
-  setTimeout(() => tryLoad(), 1500);
+  // Immediate connection attempt with 200ms initial buffer
+  setTimeout(() => tryLoad(), 200);
 
   mainWindow.on("resize", () => {
     if (mainWindow) saveWindowState(mainWindow);
