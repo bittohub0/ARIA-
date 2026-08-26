@@ -1,0 +1,43 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile containing onboarding state and preferences.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The user's chosen name"
+        },
+        "gender": {
+          "type": "string",
+          "enum": ["male", "female"],
+          "description": "The user's gender"
+        },
+        "onboardingCompleted": {
+          "type": "boolean",
+          "description": "Whether onboarding has been completed"
+        },
+        "enableTypingMode": {
+          "type": "boolean",
+          "description": "Whether text input prompt bar is enabled for active sessions"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "The dynamic creation ISO timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "The dynamic last update ISO timestamp"
+        }
+      },
+      "required": ["name", "gender", "onboardingCompleted"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profiles indexed by generated local device/user ID"
+    }
+  }
+}

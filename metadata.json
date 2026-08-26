@@ -1,0 +1,6 @@
+{
+  "name": "ARIA AI Assistant",
+  "description": "A real-time voice-to-voice AI assistant featuring interactive conversation and live tool execution.",
+  "requestFramePermissions": ["microphone", "display-capture", "geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

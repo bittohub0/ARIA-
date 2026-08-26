@@ -1,0 +1,37 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Path identification guard (Pillar 3)
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Standalone Validation Helper (Pillar 2) to match UserProfile entity and block ghost fields
+    function isValidProfile(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() <= 100
+        && data.gender is string && (data.gender == "male" || data.gender == "female")
+        && data.onboardingCompleted is bool
+        && (!data.keys().hasAll(["enableTypingMode"]) || data.enableTypingMode is bool)
+        && (!data.keys().hasAll(["createdAt"]) || data.createdAt is string)
+        && (!data.keys().hasAll(["updatedAt"]) || data.updatedAt is string)
+        && data.keys().hasAll(["name", "gender", "onboardingCompleted"])
+        && data.keys().size() <= 6;
+    }
+
+    // Users Collection Match Pattern
+    match /users/{userId} {
+      // Allow getting single profiles to load onboarding state; block list/scraping (Pillar 6, 8)
+      allow get: if isValidId(userId);
+      allow list, delete: if false;
+
+      // Validate creation and update via Standalone Blueprint to prevent Update-Gaps (Pillar 2, 4)
+      allow create, update: if isValidId(userId) && isValidProfile(request.resource.data);
+    }
+  }
+}
