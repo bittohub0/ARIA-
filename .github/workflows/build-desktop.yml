@@ -1,4 +1,4 @@
-name: Build ARIA Cross-Platform Desktop
+name: Build ARIA Desktop (Windows & macOS)
 
 on:
   push:
@@ -34,15 +34,9 @@ jobs:
           - os: windows-latest
             platform: windows
             build_script: npm run build:windows
-            artifact_pattern: dist-desktop/ARIA-Setup*.exe
           - os: macos-latest
             platform: mac
             build_script: npm run build:mac
-            artifact_pattern: dist-desktop/ARIA*.dmg
-          - os: ubuntu-latest
-            platform: linux
-            build_script: npm run build:linux
-            artifact_pattern: dist-desktop/ARIA*.AppImage,dist-desktop/ARIA*.deb
 
     steps:
       - name: Checkout Code
@@ -53,12 +47,6 @@ jobs:
         with:
           node-version: 20
           cache: 'npm'
-
-      - name: Install System Dependencies (Linux)
-        if: matrix.platform == 'linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libarchive-tools libpulse-dev libasound2-dev libx11-dev libxtst-dev libpng-dev
 
       - name: Install Dependencies
         run: npm ci || npm install
@@ -96,8 +84,8 @@ jobs:
       - name: Organize Release Assets
         run: |
           mkdir -p final-release-assets
-          find release-artifacts -type f \( -name "*.exe" -o -name "*.dmg" -o -name "*.AppImage" -o -name "*.deb" -o -name "*.zip" \) -exec cp {} final-release-assets/ \;
-          echo "Release files ready for upload:"
+          find release-artifacts -type f \( -name "*.exe" -o -name "*.dmg" -o -name "*.zip" \) -exec cp {} final-release-assets/ \;
+          echo "Release files ready for upload (Windows & macOS only):"
           ls -la final-release-assets
 
       - name: Determine Release Tag
@@ -125,3 +113,4 @@ jobs:
             final-release-assets/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
